@@ -1,0 +1,56 @@
+name: build-site
+
+on:
+  push:
+    branches: [main, master]
+    paths-ignore:
+      - "resources/lecture-pdfs/**"
+      - "_incoming/**"
+
+  workflow_run:
+    workflows: ["Attach live lecture notes"]
+    types: [completed]
+
+  workflow_dispatch: {}
+
+jobs:
+  build-and-deploy:
+    if: |
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+
+    runs-on: ubuntu-latest
+
+    concurrency:
+      group: "pages"
+      cancel-in-progress: true
+
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Checkout default branch
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      # Official Jekyll build step for Pages
+      - name: Build site with Jekyll
+        uses: actions/jekyll-build-pages@v1
+        with:
+          source: .
+          destination: ./_site
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ./_site
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
